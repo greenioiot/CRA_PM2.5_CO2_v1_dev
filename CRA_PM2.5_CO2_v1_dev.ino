@@ -33,7 +33,7 @@
 #include "lv3.h"
 #include "lv4.h"
 #include "lv5.h"
-//#include "lv6.h"
+#include "lv6.h"
 //#include "BluetoothSerial.h"
 //#include "Splash2.h"
 #include "NBIOT.h"
@@ -860,27 +860,25 @@ void t2CallShowEnv() {
     ind.createSprite(320, 10);
     ind.fillSprite(TFT_BLACK);
 
-    if ((data.pm25_env >= 0) && (data.pm25_env <= 25)) {
+    if ((data.pm25_env >= 0) && (data.pm25_env <= 15.4)) {
       tft.setWindow(0, 25, 55, 55);
       tft.pushImage(tft.width() - lv1Width - 6, 45, lv1Width, lv1Height, lv1);
-      ind.fillTriangle(5, 0, 10, 5, 15, 0, FILLCOLOR1);
-
-    } else if ((data.pm25_env > 25) && (data.pm25_env <= 37)  ) {
+      ind.fillTriangle(0, 0, 5, 5, 10, 0, FILLCOLOR1);
+    } else if ((data.pm25_env >= 15.5) && (data.pm25_env <= 40.4)  ) {
       tft.pushImage(tft.width() - lv2Width - 6, 45, lv2Width, lv2Height, lv2);
-      ind.fillTriangle(75, 0, 80, 5, 85, 0, FILLCOLOR1);
-
-    } else  if ((data.pm25_env > 37) && (data.pm25_env <= 50)  ) {
+      ind.fillTriangle(55, 0, 60, 5, 65, 0, FILLCOLOR1);
+    } else  if ((data.pm25_env >= 40.5) && (data.pm25_env <= 65.4)  ) {
       tft.pushImage(tft.width() - lv3Width - 6, 45, lv3Width, lv3Height, lv3);
-      ind.fillTriangle(130, 0, 135, 5, 140, 0, FILLCOLOR1);
-
-    } else  if ((data.pm25_env > 50) && (data.pm25_env <= 90)  ) {
+      ind.fillTriangle(105, 0, 110, 5, 115, 0, FILLCOLOR1);
+    } else  if ((data.pm25_env >= 65.5) && (data.pm25_env <= 150.4)  ) {
       tft.pushImage(tft.width() - lv4Width - 6, 45, lv4Width, lv4Height, lv4);
-      ind.fillTriangle(195, 0, 200, 5, 205, 0, FILLCOLOR1);
-
-    } else  if ((data.pm25_env > 90)) {
+      ind.fillTriangle(155, 0, 160, 5, 165, 0, FILLCOLOR1);
+    } else  if ((data.pm25_env >= 150.5) && (data.pm25_env <= 250.4)  ) {
       tft.pushImage(tft.width() - lv5Width - 6, 45, lv5Width, lv5Height, lv5);
-      ind.fillTriangle(255, 0, 260, 5, 265, 0, FILLCOLOR1);
-
+      ind.fillTriangle(210, 0, 215, 5, 220, 0, FILLCOLOR1);
+    } else {
+      tft.pushImage(tft.width() - lv6Width - 6, 45, lv6Width, lv6Height, lv6);
+      ind.fillTriangle(265, 0, 270, 5, 275, 0, FILLCOLOR1);
     }
     ind.pushSprite(29, 175);
     ind.deleteSprite();
