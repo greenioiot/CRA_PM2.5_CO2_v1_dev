@@ -1,3 +1,28 @@
+
+#define TFT_BLACK       0x0000      /*   0,   0,   0 */
+#define TFT_NAVY        0x000F      /*   0,   0, 128 */
+#define TFT_DARKGREEN   0x03E0      /*   0, 128,   0 */
+#define TFT_DARKCYAN    0x03EF      /*   0, 128, 128 */
+#define TFT_MAROON      0x7800      /* 128,   0,   0 */
+#define TFT_PURPLE      0x780F      /* 128,   0, 128 */
+#define TFT_OLIVE       0x7BE0      /* 128, 128,   0 */
+#define TFT_LIGHTGREY   0xD69A      /* 211, 211, 211 */
+#define TFT_DARKGREY    0x7BEF      /* 128, 128, 128 */
+#define TFT_BLUE        0x001F      /*   0,   0, 255 */
+#define TFT_GREEN       0x07E0      /*   0, 255,   0 */
+#define TFT_CYAN        0x07FF      /*   0, 255, 255 */
+#define TFT_RED         0xF800      /* 255,   0,   0 */
+#define TFT_MAGENTA     0xF81F      /* 255,   0, 255 */
+#define TFT_YELLOW      0xFEE0      /* 255, 255,   0 */
+#define TFT_WHITE       0xFFFF      /* 255, 255, 255 */
+#define TFT_ORANGE      0xFF83      /* 255, 180,   0 */
+#define TFT_GREENYELLOW 0xB7E0      /* 180, 255,   0 */
+#define TFT_PINK        0xFE19      /* 255, 192, 203 */
+#define TFT_BROWN       0x9A60      /* 150,  75,   0 */
+#define TFT_GOLD        0xFEA0      /* 255, 215,   0 */
+#define TFT_SILVER      0xC618      /* 192, 192, 192 */
+#define TFT_SKYBLUE     0x867D      /* 135, 206, 235 */
+#define TFT_VIOLET      0x915C      /* 180,  46, 226 */
 //
 //#include "BluetoothSerial.h"
 //
@@ -25,7 +50,7 @@
 #include <BME280I2C.h>
 #include <Wire.h>
 
-//#include "Adafruit_SGP30.h"
+#include "Adafruit_SGP30.h"
 
 #include "Logo.h"
 #include "lv1.h"
@@ -45,8 +70,8 @@
 
 // Instantiate eeprom objects with parameter/argument names and sizes
 
-//EEPROMClass  TVOCBASELINE("eeprom1", 0x200);
-//EEPROMClass  eCO2BASELINE("eeprom2", 0x100);
+EEPROMClass  TVOCBASELINE("eeprom1", 0x200);
+EEPROMClass  eCO2BASELINE("eeprom2", 0x100);
 
 
 #define _TASK_SLEEP_ON_IDLE_RUN
@@ -67,8 +92,12 @@ Scheduler runner;
 #define title1 "PM2.5" // Text that will be printed on screen in any font
 #define title2 "PM1"
 #define title3 "PM10"
-#define title4 "ug/m3"
-#define title5 "Updating"
+#define title4 "CO2"
+#define title5 "VOC"
+#define title6 "Update"
+#define title7 "ug/m3"
+#define title8 "RH"
+#define title9 "T"
 #define FILLCOLOR1 0xFFFF
 
 #define TFT_BURGUNDY  0xF1EE
@@ -95,31 +124,19 @@ String json = "";
 String attr = "";
 
 HardwareSerial hwSerial(2);
-//#define SERIAL1_RXPIN 26
-//#define SERIAL1_TXPIN 25 // for thingcontrol board v1.7
+ 
 #define SERIAL1_RXPIN 16
 #define SERIAL1_TXPIN 17
 BME280I2C bme;    // Default : forced mode, standby time = 1000 ms
 
 
-
-//String deviceToken = "20204229";
+ 
 String deviceToken = "";
 String serverIP = "147.50.151.130"; // Your Server IP;
 String serverPort = "19956"; // Your Server Port;
 
 
-//String deviceToken = "mBqFnwLw6sLUsg3lIv3M";  //Sripratum@thingcontrio.io
-
-//
-////static const char *fingerprint PROGMEM = "69 E5 FE 17 2A 13 9C 7C 98 94 CA E0 B0 A6 CB 68 66 6C CB 77"; // need to update every 3 months
-//unsigned long startMillis;  //some global variables available anywhere in the program
-//unsigned long startTeleMillis;
-//unsigned long starSendTeletMillis;
-//unsigned long currentMillis;
-//const unsigned long periodCallBack = 1000;  //the value is a number of milliseconds
-//const unsigned long periodSendTelemetry = 10000;  //the value is a number of milliseconds
-
+ 
 WiFiClientSecure wifiClient;
 PubSubClient client(wifiClient);
 
@@ -133,8 +150,8 @@ float temp(NAN), hum(NAN), pres(NAN);
 #include "time.h"
 #include <ArduinoOTA.h>
 
-#define HOSTNAME "DustBoy"
-#define PASSWORD "12345678"
+#define HOSTNAME "GreenIO"
+#define PASSWORD "green7650"
 
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 3600 * 7;
@@ -148,6 +165,13 @@ unsigned long _epoch = 0;
 struct tm timeinfo;
 WiFiManager wifiManager;
 //const boolean isCALIBRATESGP30 = false;
+Adafruit_SGP30 sgp;
+uint32_t getAbsoluteHumidity(float temperature, float humidity) {
+  // approximation formula from Sensirion SGP30 Driver Integration chapter 3.15
+  const float absoluteHumidity = 216.7f * ((humidity / 100.0f) * 6.112f * exp((17.62f * temperature) / (243.12f + temperature)) / (273.15f + temperature)); // [g/m^3]
+  const uint32_t absoluteHumidityScaled = static_cast<uint32_t>(1000.0f * absoluteHumidity); // [mg/m^3]
+  return absoluteHumidityScaled;
+}
 
 String imsi = "";
 String NCCID = "";
@@ -157,8 +181,9 @@ TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite stringPM25 = TFT_eSprite(&tft);
 TFT_eSprite stringPM1 = TFT_eSprite(&tft);
 TFT_eSprite stringPM10 = TFT_eSprite(&tft);
-//TFT_eSprite stringCO2 = TFT_eSprite(&tft);
 TFT_eSprite stringUpdate = TFT_eSprite(&tft);
+TFT_eSprite stringCO2 = TFT_eSprite(&tft);
+TFT_eSprite stringVOC = TFT_eSprite(&tft);
 
 TFT_eSprite topNumber = TFT_eSprite(&tft);
 TFT_eSprite ind = TFT_eSprite(&tft);
@@ -228,8 +253,8 @@ void setupOTA()
     //int progressbar = (progress / 5) % 100;
     //int pro = progress / (total / 100);
 
-    drawUpdate(progressbar, 265, 195);
-    tft.drawString(title5, 310, 235, GFXFF); // Print the test text in the custom font
+    drawUpdate(progressbar, 170, 13);
+//    tft.drawString(title6, 190, 20, GFXFF); // Print the test text in the custom font
 
 
     Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
@@ -447,18 +472,18 @@ void tCallback() {
 }
 struct pms7003data data;
 //
-//void calibrate() {
-//  uint16_t readTvoc = 0;
-//  uint16_t readCo2 = 0;
-//  Serial.println("Done Calibrate");
-//  TVOCBASELINE.get(0, readTvoc);
-//  eCO2BASELINE.get(0, readCo2);
-//
-//  //  Serial.println("Calibrate");
-//  Serial.print("****Baseline values: eCO2: 0x"); Serial.print(readCo2, HEX);
-//  Serial.print(" & TVOC: 0x"); Serial.println(readTvoc, HEX);
-//  sgp.setIAQBaseline(readCo2, readTvoc);
-//}
+void calibrate() {
+  uint16_t readTvoc = 0;
+  uint16_t readCo2 = 0;
+  Serial.println("Done Calibrate");
+  TVOCBASELINE.get(0, readTvoc);
+  eCO2BASELINE.get(0, readCo2);
+
+  //  Serial.println("Calibrate");
+  Serial.print("****Baseline values: eCO2: 0x"); Serial.print(readCo2, HEX);
+  Serial.print(" & TVOC: 0x"); Serial.println(readTvoc, HEX);
+  sgp.setIAQBaseline(readCo2, readTvoc);
+}
 
 
 void configModeCallback (WiFiManager *myWiFiManager) {
@@ -511,23 +536,34 @@ void errorTimeDisplay(int i) {
   int ypos = tft.height() / 2;
   tft.drawString("Connect NB failed " + String(i + 1) + " times", xpos, ypos, GFXFF);
 }
+void _initSGP30 () {
+  if (! sgp.begin()) {
+    Serial.println("Sensor not found :(");
+    while (1);
+  }
+  Serial.print("Found SGP30 serial #");
+  Serial.print(sgp.serialnumber[0], HEX);
+  Serial.print(sgp.serialnumber[1], HEX);
+  Serial.println(sgp.serialnumber[2], HEX);
 
+  calibrate();
+}
 void setup() {
   Serial.begin(115200);
   //  SerialBT.begin(HOSTNAME); //Bluetooth device name
   //SerialBT.println(HOSTNAME);
   EEPROM.begin(512);
-    pinMode(32, OUTPUT);
-    digitalWrite(32, LOW);    // turn the LED off by making the voltage LOW
+  pinMode(32, OUTPUT);
+  digitalWrite(32, LOW);    // turn the LED off by making the voltage LOW
   _initLCD();
 
   pinMode(15, OUTPUT); // turn on PMS7003
   digitalWrite(15, HIGH); // turn on PMS7003
   //delay(500);
-//  pinMode(32, OUTPUT); // on BME280
-//  digitalWrite(32, HIGH); // on BME280
-//  pinMode(33, OUTPUT); // on i2c
-//  digitalWrite(33, HIGH); // on i2c
+  //  pinMode(32, OUTPUT); // on BME280
+  //  digitalWrite(32, HIGH); // on BME280
+  //  pinMode(33, OUTPUT); // on i2c
+  //  digitalWrite(33, HIGH); // on i2c
 
   pinMode(12, OUTPUT);
   pinMode(4, OUTPUT);
@@ -562,7 +598,7 @@ void setup() {
   wifiManager.setTimeout(60);
 
   wifiManager.setAPCallback(configModeCallback);
-  String wifiName = "@DustBoyTPlus-";
+  String wifiName = "@AIRMASS2.5Ins";
   wifiName.concat(String((uint32_t)ESP.getEfuseMac(), HEX));
   if (!wifiManager.autoConnect(wifiName.c_str())) {
     //Serial.println("failed to connect and hit timeout");
@@ -592,7 +628,7 @@ void setup() {
   hwSerial.begin(9600, SERIAL_8N1, SERIAL1_RXPIN, SERIAL1_TXPIN);
   _initBME280();
 
-  //  _initSGP30();
+  _initSGP30();
   runner.init();
   //  Serial.println("Initialized scheduler");
 
@@ -622,12 +658,12 @@ void setup() {
   //  t2CallshowEnv() ;
   for (int i = 0; i < 1000; i++);
   tft.fillScreen(TFT_BLACK);            // Clear screen
-  tft.fillRect(5, 185, tft.width() - 15, 5, TFT_BLUE); // Print the test text in the custom font
-  tft.fillRect(70, 185, tft.width() - 15, 5, TFT_GREEN); // Print the test text in the custom font
-  tft.fillRect(135, 185, tft.width() - 15, 5, TFT_YELLOW); // Print the test text in the custom font
-  tft.fillRect(200, 185, tft.width() - 15, 5, TFT_ORANGE); // Print the test text in the custom font
-  tft.fillRect(260, 185, tft.width() - 15, 5, TFT_RED); // Print the test text in the custom font
-
+   tft.fillRect(5, 185, tft.width() - 15, 5, TFT_GREEN); // Print the test text in the custom font
+  tft.fillRect(63, 185, tft.width() - 15, 5, TFT_YELLOW); // Print the test text in the custom font
+  tft.fillRect(113, 185, tft.width() - 15, 5, TFT_ORANGE); // Print the test text in the custom font
+  tft.fillRect(166, 185, tft.width() - 15, 5, TFT_RED); // Print the test text in the custom font
+  tft.fillRect(219, 185, tft.width() - 15, 5, TFT_PURPLE); // Print the test text in the custom font
+  tft.fillRect(272, 185, tft.width() - 15, 5, TFT_BURGUNDY); // Print the test text in the custom font
 }
 
 /*void reconnectMqtt()
@@ -656,7 +692,7 @@ void splash() {
   tft.setFreeFont(FSB9);
   xpos = tft.width() / 2; // Half the screen width
   ypos = 150;
-  tft.drawString("DustBoy Model-T-Plus", xpos, ypos, GFXFF);  // Draw the text string in the selected GFX free font
+  tft.drawString("AIRMASS2.5 Inspector", xpos, ypos, GFXFF);  // Draw the text string in the selected GFX free font
   AISnb.debug = true;
   AISnb.setupDevice(serverPort);
   //
@@ -735,23 +771,23 @@ void composeJson() {
   json.concat(",\"pm10\":");
   json.concat(data.pm100_env);
 
-  //  json.concat(",\"pn03\":");
-  //  json.concat(data.particles_03um);
-  //  json.concat(",\"pn05\":");
-  //  json.concat(data.particles_05um);
-  //  json.concat(",\"pn10\":");
-  //  json.concat(data.particles_10um);
-  //  json.concat(",\"pn25\":");
-  //  json.concat(data.particles_25um);
-  //  json.concat(",\"pn50\":");
-  //  json.concat(data.particles_50um);
-  //  json.concat(",\"pn100\":");
-  //  json.concat(data.particles_100um);
-  //  json.concat(",\"co2\":");
-  //  json.concat(sgp.eCO2);
-  //  json.concat(",\"voc\":");
-  //  json.concat(sgp.TVOC);
-
+  json.concat(",\"pn03\":");
+  json.concat(data.particles_03um);
+  json.concat(",\"pn05\":");
+  json.concat(data.particles_05um);
+  json.concat(",\"pn10\":");
+  json.concat(data.particles_10um);
+  json.concat(",\"pn25\":");
+  json.concat(data.particles_25um);
+  json.concat(",\"pn50\":");
+  json.concat(data.particles_50um);
+  json.concat(",\"pn100\":");
+  json.concat(data.particles_100um);
+  json.concat(",\"co2\":");
+  json.concat(sgp.eCO2);
+  json.concat(",\"voc\":");
+  json.concat(sgp.TVOC);
+  json.concat(",\"project\":\"CRA\"");
   json.concat(",\"rssi\":");
   if (connectWifi == false) {
     json.concat(meta.rssi);
@@ -801,6 +837,18 @@ void t4CallPrintPMS7003() {
 
 
 
+void drawVOC(int num, int x, int y)
+{
+  stringVOC.createSprite(60, 20);
+  //  stringVOC.fillSprite(TFT_GREEN);
+  stringVOC.setFreeFont(FSB9);
+  stringVOC.setTextColor(TFT_WHITE);
+  stringVOC.setTextSize(1);
+  stringVOC.drawNumber(num, 0, 3);
+  stringVOC.pushSprite(x, y);
+  stringVOC.deleteSprite();
+}
+
 void t2CallShowEnv() {
   //  Serial.print(F("ready2display:"));
   //  Serial.println(ready2display);
@@ -814,14 +862,14 @@ void t2CallShowEnv() {
     tft.setFreeFont(CF_OL24);
     int mid = (tftMax / 2) - 72;
     tft.setTextPadding(100);
-    tft.drawString(title4, xpos - 70, 125, GFXFF); // Print the test text in the custom font
+    tft.drawString(title7, xpos - 70, 125, GFXFF); // Print the test text in the custom font
 
     tft.setFreeFont(CF_OL32);
     tft.drawString(title1, xpos - 70, 155, GFXFF); // Print the test text in the custom font
 
     // ################################################################ for testing
-    //    data.pm25_env = testNum;    //for testing
-    //    testNum++;
+//        data.pm25_env = testNum;    //for testing
+//        testNum++;
     // ################################################################ end test
 
 
@@ -839,24 +887,25 @@ void t2CallShowEnv() {
     drawPM1(data.pm01_env, 6, 195);
     tft.drawString(title2, 40, 235, GFXFF); // Print the test text in the custom font
 
-    drawPM10(data.pm100_env, 65, 195);
-    tft.drawString(title3, 110, 235, GFXFF); // Print the test text in the custom font
+    drawPM10(data.pm100_env, 60, 195);
+    tft.drawString(title3, 100, 235, GFXFF); // Print the test text in the custom font
 
-    //    drawCO2(sgp.eCO2, 130, 195);
-    //    tft.drawString(title4, 160, 235, GFXFF); // Print the test text in the custom font
+    drawCO2(sgp.eCO2, 120, 195);
+    tft.drawString(title4, 155, 235, GFXFF); // Print the test text in the custom font
 
-    //    drawVOC(sgp.TVOC, 185, 195);f
-    //    tft.drawString(title5, 225, 235, GFXFF); // Print the test text in the custom font
+    drawVOC(sgp.TVOC, 185, 195);
+    tft.drawString(title5, 220, 235, GFXFF); // Print the test text in the custom font
 
-    tft.drawString("RH", 148, 235, GFXFF); // Print the test text in the custom font
-    drawH(hum, 124, 195);
-    tft.drawString("%", 163, 215, GFXFF);
+    tft.drawString(title8, 260, 215, GFXFF); // Print the test text in the custom font
+    drawH(hum, 270, 195);
+    tft.drawString("%", 345, 215, GFXFF);
 
-    tft.drawString("T", 197, 235, GFXFF); // Print the test text in the custom font
-    drawT(temp, 183, 195);
-    tft.drawString("C", 218, 215, GFXFF);
+    tft.drawString(title9, 260, 235, GFXFF); // Print the test text in the custom font
+    drawT(temp, 270, 215);
+    tft.drawString("C", 340, 235, GFXFF);
+    
     //Clear Stage
-    //THAI AQI 5 level
+     
     ind.createSprite(320, 10);
     ind.fillSprite(TFT_BLACK);
 
@@ -864,15 +913,19 @@ void t2CallShowEnv() {
       tft.setWindow(0, 25, 55, 55);
       tft.pushImage(tft.width() - lv1Width - 6, 45, lv1Width, lv1Height, lv1);
       ind.fillTriangle(0, 0, 5, 5, 10, 0, FILLCOLOR1);
+      
     } else if ((data.pm25_env >= 15.5) && (data.pm25_env <= 40.4)  ) {
       tft.pushImage(tft.width() - lv2Width - 6, 45, lv2Width, lv2Height, lv2);
       ind.fillTriangle(55, 0, 60, 5, 65, 0, FILLCOLOR1);
+      
     } else  if ((data.pm25_env >= 40.5) && (data.pm25_env <= 65.4)  ) {
       tft.pushImage(tft.width() - lv3Width - 6, 45, lv3Width, lv3Height, lv3);
       ind.fillTriangle(105, 0, 110, 5, 115, 0, FILLCOLOR1);
+      
     } else  if ((data.pm25_env >= 65.5) && (data.pm25_env <= 150.4)  ) {
       tft.pushImage(tft.width() - lv4Width - 6, 45, lv4Width, lv4Height, lv4);
       ind.fillTriangle(155, 0, 160, 5, 165, 0, FILLCOLOR1);
+      
     } else  if ((data.pm25_env >= 150.5) && (data.pm25_env <= 250.4)  ) {
       tft.pushImage(tft.width() - lv5Width - 6, 45, lv5Width, lv5Height, lv5);
       ind.fillTriangle(210, 0, 215, 5, 220, 0, FILLCOLOR1);
@@ -979,6 +1032,47 @@ void t5CallSendAttribute() {
 
 }
 
+void getDataSGP30 () {
+  // put your main code here, to run repeatedly:
+  // If you have a temperature / humidity sensor, you can set the absolute humidity to enable the humditiy compensation for the air quality signals
+  float temperature = temp; // [°C]
+  float humidity = hum; // [%RH]
+  sgp.setHumidity(getAbsoluteHumidity(temperature, humidity));
+
+  if (! sgp.IAQmeasure()) {
+    Serial.println("Measurement failed");
+    return;
+  }
+  Serial.print("TVOC "); Serial.print(sgp.TVOC); Serial.print(" ppb\t");
+  Serial.print("eCO2 "); Serial.print(sgp.eCO2); Serial.println(" ppm");
+
+
+  if (! sgp.IAQmeasureRaw()) {
+    Serial.println("Raw Measurement failed");
+    return;
+  }
+  Serial.print("Raw H2 "); Serial.print(sgp.rawH2); Serial.print(" \t");
+  Serial.print("Raw Ethanol "); Serial.print(sgp.rawEthanol); Serial.println("");
+
+
+
+  uint16_t TVOC_base, eCO2_base;
+
+  //  Serial.print("eCo2: ");   Serial.println(readCo2);
+  //  Serial.print("voc: ");  Serial.println(readTvoc);
+
+  //      sgp.setIAQBaseline(eCO2_base, TVOC_base);
+  if (! sgp.getIAQBaseline(&eCO2_base, &TVOC_base)) {
+    Serial.println("Failed to get baseline readings");
+    return;
+  }
+
+  Serial.print("****Get Baseline values: eCO2: 0x"); Serial.print(eCO2_base, HEX);
+  Serial.print(" & TVOC: 0x"); Serial.println(TVOC_base, HEX);
+
+
+
+}
 void t1CallGetProbe() {
   tCallback();
   boolean pmsReady = readPMSdata(&hwSerial);
@@ -997,7 +1091,7 @@ void t1CallGetProbe() {
     ESP.restart();
 
   printBME280Data();
-  //  getDataSGP30();
+  getDataSGP30();
 }
 
 void drawPM2_5(int num, int x, int y)
@@ -1028,19 +1122,19 @@ void drawPM2_5(int num, int x, int y)
 
 void drawT(int num, int x, int y)
 {
-  T.createSprite(50, 20);
-  //  stringPM1.fillSprite(TFT_GREEN);
+  T.createSprite(40, 20);
+  T.fillSprite(TFT_BLACK);
   T.setFreeFont(FSB9);
   T.setTextColor(TFT_WHITE);
   T.setTextSize(1);
   T.drawNumber(num, 0, 3);
   T.pushSprite(x, y);
-  T.deleteSprite();
+//  T.deleteSprite();
 }
 
 void drawH(int num, int x, int y)
 {
-  H.createSprite(50, 20);
+  H.createSprite(40, 20);
   //  stringPM1.fillSprite(TFT_GREEN);
   H.setFreeFont(FSB9);
   H.setTextColor(TFT_WHITE);
@@ -1054,30 +1148,30 @@ void drawH(int num, int x, int y)
 void drawPM1(int num, int x, int y)
 {
   stringPM1.createSprite(50, 20);
-  //  stringPM1.fillSprite(TFT_GREEN);
+  stringPM1.fillSprite(TFT_BLACK);
   stringPM1.setFreeFont(FSB9);
   stringPM1.setTextColor(TFT_WHITE);
   stringPM1.setTextSize(1);
   stringPM1.drawNumber(num, 0, 3);
   stringPM1.pushSprite(x, y);
-  stringPM1.deleteSprite();
+//  stringPM1.deleteSprite();
 }
 //
-//void drawCO2(int num, int x, int y)
-//{
-//  stringCO2.createSprite(60, 20);
-//  //  stringCO2.fillSprite(TFT_GREEN);
-//  stringCO2.setFreeFont(FSB9);
-//  stringCO2.setTextColor(TFT_WHITE);
-//  stringCO2.setTextSize(1);
-//  stringCO2.drawNumber(num, 0, 3);
-//  stringCO2.pushSprite(x, y);
+void drawCO2(int num, int x, int y)
+{
+  stringCO2.createSprite(60, 20);
+  stringCO2.fillSprite(TFT_BLACK);
+  stringCO2.setFreeFont(FSB9);
+  stringCO2.setTextColor(TFT_WHITE);
+  stringCO2.setTextSize(1);
+  stringCO2.drawNumber(num, 0, 3);
+  stringCO2.pushSprite(x, y);
 //  stringCO2.deleteSprite();
-//}
+}
 //
 void drawUpdate(int num, int x, int y)
 {
-  stringUpdate.createSprite(60, 20);
+  stringUpdate.createSprite(50, 20);
   stringUpdate.fillScreen(TFT_BLACK);
   stringUpdate.setFreeFont(FSB9);
   stringUpdate.setTextColor(TFT_ORANGE);
@@ -1085,7 +1179,7 @@ void drawUpdate(int num, int x, int y)
   stringUpdate.drawNumber(num, 0, 3);
   stringUpdate.drawString("%", 25, 3, GFXFF);
   stringUpdate.pushSprite(x, y);
-  stringUpdate.deleteSprite();
+   
 }
 void drawPM10(int num, int x, int y)
 {
@@ -1132,7 +1226,7 @@ void t3CallSendData() {
     tft.drawString("W", 265, 27);
     //client.setInsecure();
     Serial.print(" deviceToken.c_str()"); Serial.println(deviceToken.c_str());
-    if (client.connect("DustBoy", deviceToken.c_str(), NULL)) {
+    if (client.connect("AIRMASS", deviceToken.c_str(), NULL)) {
       Serial.println("******************************************************8Connected!");
       Serial.println(json.c_str());
       client.publish("v1/devices/me/telemetry", json.c_str());
